@@ -1,6 +1,5 @@
 deb-config-h.patch
 manpage.patch
-cpp-crossbuild.patch
 chown-484762.patch
 taboo-716649.patch
 fix-test-breakage.patch

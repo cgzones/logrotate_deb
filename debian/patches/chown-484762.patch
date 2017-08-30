@@ -1,8 +1,17 @@
-Index: logrotate.git/logrotate.c
+From: Paul Martin <pm@debian.org>
+Date: Wed, 30 Aug 2017 16:24:03 +0200
+Subject: chown-484762
+
 ===================================================================
---- logrotate.git.orig/logrotate.c	2016-12-29 02:36:21.851158797 +0100
-+++ logrotate.git/logrotate.c	2016-12-29 02:36:21.848158800 +0100
-@@ -496,8 +496,12 @@
+---
+ logrotate.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/logrotate.c b/logrotate.c
+index 4ad58d4..752a9ef 100644
+--- a/logrotate.c
++++ b/logrotate.c
+@@ -510,8 +510,12 @@ static int createOutputFile(char *fileName, int flags, struct stat *sb,
      if (fchmod(fd, (S_IRUSR | S_IWUSR) & sb->st_mode)) {
  	message(MESS_ERROR, "error setting mode of %s: %s\n",
  		fileName, strerror(errno));

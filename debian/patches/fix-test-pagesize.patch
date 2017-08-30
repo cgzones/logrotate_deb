@@ -1,8 +1,8 @@
+From: Paul Martin <pm@debian.org>
+Date: Wed, 30 Aug 2017 16:24:03 +0200
 Subject: Make expect value in test 62 depend on page size
-Author: Christoph Biedl <debian.axhn@manchmal.in-ulm.de>
-Bug:
-    https://buildd.debian.org/status/fetch.php?pkg=logrotate&arch=powerpc&ver=3.11.0-0.1~exp2&stamp=1483609625
-    https://buildd.debian.org/status/fetch.php?pkg=logrotate&arch=ppc64el&ver=3.11.0-0.1~exp2&stamp=1483609707
+Bug: https://buildd.debian.org/status/fetch.php?pkg=logrotate&arch=powerpc&ver=3.11.0-0.1~exp2&stamp=1483609625
+Bug: https://buildd.debian.org/status/fetch.php?pkg=logrotate&arch=ppc64el&ver=3.11.0-0.1~exp2&stamp=1483609707
 
     The Debian buildds, at least those running ppc64el (they also build
     for powerpc) put the source tree into a tmpfs. A tmpfs allocates
@@ -20,10 +20,15 @@ Bug:
 
     Reproducer:
         printf zero > test.log ; truncate -s 10M test.log ; echo x >> test.log ; du test.log
+---
+ test/test | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
+diff --git a/test/test b/test/test
+index 09cf267..02b45b2 100755
 --- a/test/test
 +++ b/test/test
-@@ -1597,7 +1597,15 @@
+@@ -1596,7 +1596,15 @@ if [ $SIZE_OLD != $SIZE_NEW ]; then
  	exit 3
  fi
  
