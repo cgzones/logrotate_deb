@@ -27,6 +27,9 @@ endif
 %:
 	dh $@
 
+override_dh_auto_configure:
+	dh_auto_configure -- --with-state-file-path=/var/lib/logrotate/status
+
 override_dh_auto_build:
 ifeq ($(DEB_HOST_ARCH_OS),linux)
 	$(MAKE) RPM_OPT_FLAGS="$(CFLAGS)" WITH_SELINUX="yes" WITH_ACL="yes" $(CROSS)
