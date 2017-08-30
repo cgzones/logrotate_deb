@@ -28,7 +28,7 @@ endif
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-state-file-path=/var/lib/logrotate/status
+	dh_auto_configure -- --with-state-file-path=/var/lib/logrotate/status --with-default-mail-command=/usr/bin/mail
 
 override_dh_auto_build:
 ifeq ($(DEB_HOST_ARCH_OS),linux)
