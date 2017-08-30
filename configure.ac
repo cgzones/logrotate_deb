@@ -1,20 +1,40 @@
-AC_INIT([logrotate],[3.11.0])
+AC_INIT([logrotate],m4_esyscmd([build-aux/git-version-gen --prefix '' .tarball-version]),
+[],[],[https://github.com/logrotate/logrotate])
+
+dnl serial-test not supported prior version 1.12
+m4_define([serial_tests], [
+    m4_esyscmd([automake --version |
+                perl -nae '{@v = split("[.]", $F[-1]);
+                            if ($v[0] >= 1 && $v[1] >= 12)
+                                {print "serial-tests\n";}
+                            exit;}'
+    ])
+])
 
 dnl foreign: Do not require AUTHORS, ChangeLog, NEWS, and README to exist
-dnl serial-tests: Do not hide standard output of our sequential test-suite
-AM_INIT_AUTOMAKE([foreign serial-tests])
+dnl serial_tests: Do not hide standard output of our sequential test-suite
+dnl dist-xz: Produce tar.xz version of the release archive
+AM_INIT_AUTOMAKE(foreign dist-xz serial_tests)
 
-AC_DEFINE(_GNU_SOURCE)
+# --enable-silent-rules
+m4_ifdef([AM_SILENT_RULES],
+  [AM_SILENT_RULES([yes])],
+  [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
 
-AM_EXTRA_RECURSIVE_TARGETS([test])
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CC
-AC_PROG_CC_STDC
+AC_PROG_CC_C99
 AC_STRUCT_ST_BLKSIZE
 AC_STRUCT_ST_BLOCKS
 
+AC_CANONICAL_HOST
+
 dnl Use 64-bit file offsets on 32-bit systems (defines C macros if necessary)
 AC_SYS_LARGEFILE
+
+dnl needed for basename() on OS X
+AC_CHECK_HEADERS([libgen.h])
 
 AC_CHECK_LIB([popt],[poptParseArgvString],,
   AC_MSG_ERROR([libpopt required but not found]))
@@ -46,6 +66,32 @@ AS_CASE(["$with_acl"],
 AS_IF([test "$ac_cv_lib_acl_acl_get_file" = yes],
   echo "1" > ./test/test.ACL;, echo "0" > ./test/test.ACL;)
 
+DEFAULT_MAIL_COMMAND="/bin/mail"
+COMPRESS_COMMAND="/bin/gzip"
+UNCOMPRESS_COMMAND="/bin/gunzip"
+COMPRESS_EXT=".gz"
+STATE_FILE_PATH="/var/lib/logrotate.status"
+
+case "$host" in
+  *-hpux*)
+          DEFAULT_MAIL_COMMAND="/usr/bin/mailx"
+          COMPRESS_COMMAND="/usr/contrib/bin/gzip"
+          UNCOMPRESS_COMMAND="/usr/contrib/bin/gunzip"
+          ;;
+  *-solaris*|*-sunos*)
+          DEFAULT_MAIL_COMMAND="/usr/bin/mailx"
+          ;;
+  *-netbsd*)
+          DEFAULT_MAIL_COMMAND="/usr/bin/mail -s"
+          COMPRESS_COMMAND="/usr/bin/gzip"
+          UNCOMPRESS_COMMAND="/usr/bin/gunzip"
+          ;;
+  *-darwin*)
+          COMPRESS_COMMAND="/usr/bin/gzip"
+          UNCOMPRESS_COMMAND="/usr/bin/gunzip"
+          ;;
+esac
+
 AC_ARG_WITH([state-file-path],
   AC_HELP_STRING([--with-state-file-path=PATH],
                  [path to state file (/var/lib/logrotate.status by default)]),
@@ -58,14 +104,98 @@ AC_ARG_WITH([state-file-path],
         STATE_FILE_PATH="$withval"
         ;;
     esac
-  ],
-  [
-    STATE_FILE_PATH="/var/lib/logrotate.status"
   ])
-AC_DEFINE_UNQUOTED([STATEFILE], "$STATE_FILE_PATH")
+AC_DEFINE_UNQUOTED([STATEFILE], ["$STATE_FILE_PATH"], [State file path.])
 AC_SUBST(STATE_FILE_PATH)
 
+AC_ARG_WITH([default-mail-command],
+  AC_HELP_STRING([--with-default-mail-command=COMMAND],
+                 [default mail command (e.g. /bin/mail -s)]),
+  [
+    case "$withval" in
+      yes|no)
+        AC_MSG_ERROR([--with-default-mail-command=COMMAND requires a command to be specified])
+        ;;
+      *)
+        DEFAULT_MAIL_COMMAND="$withval"
+        ;;
+    esac
+  ])
+AC_DEFINE_UNQUOTED([DEFAULT_MAIL_COMMAND], ["$DEFAULT_MAIL_COMMAND"], [default mail command])
+AC_SUBST(DEFAULT_MAIL_COMMAND)
+
+AC_ARG_WITH([compress-command],
+  AC_HELP_STRING([--with-compress-command=COMMAND],
+                 [compress command (default: /bin/gzip)]),
+  [
+    case "$withval" in
+      yes|no)
+        AC_MSG_ERROR([--with-compress-command=COMMAND requires a command to be specified])
+        ;;
+      *)
+        COMPRESS_COMMAND="$withval"
+        ;;
+    esac
+  ])
+AC_DEFINE_UNQUOTED([COMPRESS_COMMAND], "$COMPRESS_COMMAND", [default compress command])
+AC_SUBST(COMPRESS_COMMAND)
+
+AC_ARG_WITH([uncompress-command],
+  AC_HELP_STRING([--with-uncompress-command=COMMAND],
+                 [uncompress command (default: /bin/gunzip)]),
+  [
+    case "$withval" in
+      yes|no)
+        AC_MSG_ERROR([--with-uncompress-command=COMMAND requires a command to be specified])
+        ;;
+      *)
+        UNCOMPRESS_COMMAND="$withval"
+        ;;
+    esac
+  ])
+AC_DEFINE_UNQUOTED([UNCOMPRESS_COMMAND], "$UNCOMPRESS_COMMAND", [default uncompress command])
+AC_SUBST(UNCOMPRESS_COMMAND)
+
+AC_ARG_WITH([compress-extension],
+  AC_HELP_STRING([--with-compress-extension=EXTENSION],
+                 [compress extension (default: .gz)]),
+  [
+    case "$withval" in
+      .*)
+        COMPRESS_EXT="$withval"
+        ;;
+      *)
+        AC_MSG_ERROR([--with-compress-extension=EXTENSION must start with .])
+        ;;
+    esac
+  ])
+AC_DEFINE_UNQUOTED([COMPRESS_EXT], ["$COMPRESS_EXT"], [default compress extension])
+AC_SUBST(COMPRESS_EXT)
+
+AC_DEFINE_UNQUOTED([ROOT_UID], [0], [Root user-id.])
+AC_SUBST(ROOT_UID)
+
 AC_CHECK_FUNCS([asprintf fork madvise qsort strndup strptime vfork vsyslog])
+AC_CONFIG_HEADERS([config.h])
+
+AM_CFLAGS="-Wall"
+AC_ARG_ENABLE([werror],
+        [AS_HELP_STRING([--enable-werror],
+                [Treat warnings as errors (default: warnings are not errors)])],
+                [enable_werror="$enableval"],
+                [enable_werror=no])
+AS_IF([test "x$enable_werror" = "xyes"], [AM_CFLAGS="$AM_CFLAGS -Werror"])
+AC_SUBST([AM_CFLAGS])
 
 AC_CONFIG_FILES([Makefile test/Makefile logrotate.8 logrotate.spec])
 AC_OUTPUT
+
+AC_MSG_RESULT([
+  ${PACKAGE_NAME} ${VERSION}
+
+  default mail command:   ${DEFAULT_MAIL_COMMAND}
+  compress command:       ${COMPRESS_COMMAND}
+  uncompress command:     ${UNCOMPRESS_COMMAND}
+  compress extension:     ${COMPRESS_EXT}
+  statefile path:         ${STATE_FILE_PATH}
+])
