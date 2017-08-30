@@ -2,15 +2,15 @@ Source: logrotate
 Section: admin
 Priority: important
 Maintainer: Paul Martin <pm@debian.org>
-Build-Depends: libpopt-dev, debhelper (>= 9),
- libselinux1-dev [linux-any], libacl1-dev [linux-any], automake
+Build-Depends: libpopt-dev, debhelper (>= 10),
+ libselinux1-dev [linux-any], libacl1-dev [linux-any]
 Vcs-Svn: http://svn.fedorahosted.org/svn/logrotate/
 Homepage: https://github.com/logrotate/logrotate
-Standards-Version: 3.9.6
+Standards-Version: 4.0.0.0
 
 Package: logrotate
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, cron | anacron | cron-daemon, base-passwd (>= 2.0.3.4)
+Depends: ${shlibs:Depends}, ${misc:Depends}, cron | anacron | cron-daemon
 Breaks: postgresql-common (<= 126)
 Recommends: bsd-mailx | mailx
 Description: Log rotation utility

@@ -1,4 +1,7 @@
 #!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
 export DEB_HOST_ARCH_OS := $(shell dpkg-architecture -qDEB_HOST_ARCH_OS \
         2>/dev/null || true)
 
@@ -34,10 +37,10 @@ endif
 override_dh_auto_install:
 
 override_dh_auto_clean:
-	-$(MAKE) clean
-	-cd test ; rm -f $$(ls | egrep '^test-config.[0-9]+$$')
-	-cd test ; rm -f test*.log* anothertest*.log* state test-config.
-	-cd test ; rm -f scriptout mail-out compress-args different*.log*
+	dh_auto_clean
+	cd test ; rm -f $$(ls | egrep '^test-config.[0-9]+$$')
+	cd test ; rm -f test*.log* anothertest*.log* state test-config.
+	cd test ; rm -f scriptout mail-out compress-args different*.log*
 
 # ACL tests will fail if we're not building with ACL
 override_dh_auto_test:
@@ -46,3 +49,6 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	cd test ; ./test
   endif
 endif
+
+override_dh_missing:
+	dh_missing --fail-missing

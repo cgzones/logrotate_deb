@@ -4,6 +4,7 @@ logrotate (3.12.3-1) UNRELEASED; urgency=medium
 
   * debian/gbp.conf: add gbp configuration
   * refresh patches, drop upstream applied ones
+  * update packaging
 
  -- Christian Göttsche <cgzones@googlemail.com>  Sat, 02 Sep 2017 20:35:45 +0200
 
