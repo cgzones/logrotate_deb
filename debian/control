@@ -10,7 +10,7 @@ Standards-Version: 4.0.0.0
 
 Package: logrotate
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, cron | anacron | cron-daemon
+Depends: ${shlibs:Depends}, ${misc:Depends}, cron | anacron | cron-daemon | systemd-sysv
 Breaks: postgresql-common (<= 126)
 Recommends: bsd-mailx | mailx
 Description: Log rotation utility

@@ -4,3 +4,4 @@ chown-484762.patch
 taboo-716649.patch
 fix-test-breakage.patch
 fix-test-pagesize.patch
+0007-logrotate.service-add-hardening-options.patch

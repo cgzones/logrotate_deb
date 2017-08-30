@@ -1,2 +1,4 @@
-logrotate		usr/sbin/
-debian/logrotate.conf	etc/
+logrotate			usr/sbin/
+debian/logrotate.conf		etc/
+examples/logrotate.timer	lib/systemd/system
+examples/logrotate.service	lib/systemd/system

@@ -1,4 +1,5 @@
 #!/bin/sh
 
-test -x /usr/sbin/logrotate || exit 0
+
+test -x /usr/sbin/logrotate -a ! -d /lib/systemd/system || exit 0
 /usr/sbin/logrotate /etc/logrotate.conf
