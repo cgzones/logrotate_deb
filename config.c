@@ -23,8 +23,8 @@
 #include <wctype.h>
 #include <fnmatch.h>
 #include <sys/mman.h>
+#include <libgen.h>
 
-#include "basenames.h"
 #include "log.h"
 #include "logrotate.h"
 
@@ -33,6 +33,7 @@
 #endif
 
 #define REALLOC_STEP    10
+#define GLOB_STR_REALLOC_STEP	0x100
 
 #if defined(SunOS)
 #include <limits.h>
@@ -125,16 +126,28 @@ enum {
 	STATE_ERROR = 64,
 };
 
-static char *defTabooExts[] = { ".rpmsave", ".rpmorig", "~", ",v",
-    ".disabled", ".dpkg-old", ".dpkg-dist", ".dpkg-new", ".cfsaved",
-    ".ucf-old", ".ucf-dist", ".ucf-new",
-    ".rpmnew", ".swp", ".cfsaved", ".rhn-cfg-tmp-*"
+static const char *defTabooExts[] = {
+	",v",
+	".cfsaved",
+	".disabled",
+	".dpkg-dist",
+	".dpkg-new",
+	".dpkg-old",
+	".rhn-cfg-tmp-*",
+	".rpmnew",
+	".rpmorig",
+	".rpmsave",
+	".swp",
+	".ucf-dist",
+	".ucf-new",
+	".ucf-old",
+	"~"
 };
 static int defTabooCount = sizeof(defTabooExts) / sizeof(char *);
 
 /* I shouldn't use globals here :-( */
 static char **tabooPatterns = NULL;
-int tabooCount = 0;
+static int tabooCount = 0;
 static int glob_errno = 0;
 
 static int readConfigFile(const char *configFile, struct logInfo *defConfig);
@@ -142,34 +155,38 @@ static int globerr(const char *pathname, int theerr);
 
 static char *isolateLine(char **strt, char **buf, size_t length) {
 	char *endtag, *start, *tmp;
+	const char *max = *buf + length;
+	char *key;
+
 	start = *strt;
 	endtag = start;
-	while (endtag - *buf < length && *endtag != '\n') {
+	while (endtag < max && *endtag != '\n') {
 		endtag++;}
-	if (endtag - *buf > length)
+	if (max < endtag)
 		return NULL;
 	tmp = endtag - 1;
 	while (isspace((unsigned char)*endtag))
 		endtag--;
-	char *key = strndup(start, endtag - start + 1);
+	key = strndup(start, endtag - start + 1);
 	*strt = tmp;
 	return key;
 }
 
-static char *isolateValue(const char *fileName, int lineNum, char *key,
+static char *isolateValue(const char *fileName, int lineNum, const char *key,
 			char **startPtr, char **buf, size_t length)
 {
     char *chptr = *startPtr;
+    const char *max = *startPtr + length;
 
-    while (chptr - *buf < length && isblank((unsigned char)*chptr))
+    while (chptr < max && isblank((unsigned char)*chptr))
 	chptr++;
-    if (chptr - *buf < length && *chptr == '=') {
+    if (chptr < max && *chptr == '=') {
 	chptr++;
-	while ( chptr - *buf < length && isblank((unsigned char)*chptr))
+	while ( chptr < max && isblank((unsigned char)*chptr))
 	    chptr++;
     }
 
-    if (chptr - *buf < length && *chptr == '\n') {
+    if (chptr < max && *chptr == '\n') {
 		message(MESS_ERROR, "%s:%d argument expected after %s\n",
 			fileName, lineNum, key);
 		return NULL;
@@ -181,25 +198,26 @@ static char *isolateValue(const char *fileName, int lineNum, char *key,
 
 static char *isolateWord(char **strt, char **buf, size_t length) {
 	char *endtag, *start;
+	const char *max = *buf + length;
 	char *key;
 	start = *strt;
-	while (start - *buf < length && isblank((unsigned char)*start))
+	while (start < max && isblank((unsigned char)*start))
 		start++;
 	endtag = start;
-	while (endtag - *buf < length && isalpha((unsigned char)*endtag)) {
+	while (endtag < max && isalpha((unsigned char)*endtag)) {
 		endtag++;}
-	if (endtag - *buf > length)
+	if (max < endtag)
 		return NULL;
 	key = strndup(start, endtag - start);
 	*strt = endtag;
 	return key;
 }
 
-static char *readPath(const char *configFile, int lineNum, char *key,
+static char *readPath(const char *configFile, int lineNum, const char *key,
 		      char **startPtr, char **buf, size_t length)
 {
     char *chptr;
-    char *start = *startPtr;
+    char *start;
     char *path;
 
     wchar_t pwc;
@@ -240,7 +258,7 @@ static int readModeUidGid(const char *configFile, int lineNum, char *key,
 							const char *directive, mode_t *mode, uid_t *uid,
 							gid_t *gid) {
 	char u[200], g[200];
-	int m;
+	unsigned int m;
 	char tmp;
 	int rc;
 	struct group *group;
@@ -296,7 +314,7 @@ static int readModeUidGid(const char *configFile, int lineNum, char *key,
 	return 0;
 }
 
-static char *readAddress(const char *configFile, int lineNum, char *key,
+static char *readAddress(const char *configFile, int lineNum, const char *key,
 			 char **startPtr, char **buf, size_t length)
 {
     char *endtag, *chptr;
@@ -363,7 +381,7 @@ static int mkpath(const char *path, mode_t mode, uid_t uid, gid_t gid) {
 
 	rv = 0;
 	pp = copypath;
-	while (rv == 0 && (sp = strchr(pp, '/')) != 0) {
+	while (rv == 0 && (sp = strchr(pp, '/')) != NULL) {
 		if (sp != pp) {
 			*sp = '\0';
 			rv = do_mkdir(copypath, mode, uid, gid);
@@ -421,6 +439,7 @@ static void copyLogInfo(struct logInfo *to, struct logInfo *from)
     if (from->oldDir)
 	to->oldDir = strdup(from->oldDir);
     to->criterium = from->criterium;
+    to->weekday = from->weekday;
     to->threshhold = from->threshhold;
     to->minsize = from->minsize;
     to->maxsize = from->maxsize;
@@ -521,8 +540,8 @@ static void freeTailLogs(int num)
 static int readConfigPath(const char *path, struct logInfo *defConfig)
 {
     struct stat sb;
-    int here, oldnumlogs, result = 1;
-	struct logInfo defConfigBackup;
+    int here, result = 0;
+    struct logInfo defConfigBackup;
 
     if (stat(path, &sb)) {
 	message(MESS_ERROR, "cannot stat %s: %s\n", path, strerror(errno));
@@ -599,17 +618,14 @@ static int readConfigPath(const char *path, struct logInfo *defConfig)
 
 	for (i = 0; i < files_count; ++i) {
 	    assert(namelist[i] != NULL);
-	    oldnumlogs = numLogs;
 	    copyLogInfo(&defConfigBackup, defConfig);
 	    if (readConfigFile(namelist[i], defConfig)) {
 		message(MESS_ERROR, "found error in file %s, skipping\n", namelist[i]);
-		freeTailLogs(numLogs - oldnumlogs);
 		freeLogInfo(defConfig);
 		copyLogInfo(defConfig, &defConfigBackup);
 		freeLogInfo(&defConfigBackup);
+		result = 1;
 		continue;
-	    } else {
-		result = 0;
 	    }
 	    freeLogInfo(&defConfigBackup);
 	}
@@ -620,14 +636,11 @@ static int readConfigPath(const char *path, struct logInfo *defConfig)
 	close(here);
 	free_2d_array(namelist, files_count);
     } else {
-    	oldnumlogs = numLogs;
 	copyLogInfo(&defConfigBackup, defConfig);
 	if (readConfigFile(path, defConfig)) {
-	    freeTailLogs(numLogs - oldnumlogs);
 	    freeLogInfo(defConfig);
 	    copyLogInfo(defConfig, &defConfigBackup);
-	} else {
-	    result = 0;
+	    result = 1;
 	}
 	freeLogInfo(&defConfigBackup);
     }
@@ -698,18 +711,90 @@ int readAllConfigPaths(const char **paths)
     }
 
     for (file = paths; *file; file++) {
-	if (readConfigPath(*file, &defConfig)) {
+	if (readConfigPath(*file, &defConfig))
 	    result = 1;
-	    break;
-	}
     }
     free_2d_array(tabooPatterns, tabooCount);
     freeLogInfo(&defConfig);
     return result;
 }
 
+static char* parseGlobString(const char *configFile, int lineNum,
+			     const char *buf, off_t length, char **ppos)
+{
+    /* output buffer */
+    char *globString = NULL;
+    size_t globStringPos = 0;
+    size_t globStringAlloc = 0;
+    enum {
+	PGS_INIT,	/* picking blanks, looking for '#' */
+	PGS_DATA,	/* picking data, looking for end of line */
+	PGS_COMMENT	/* skipping comment, looking for end of line */
+    } state = PGS_INIT;
+
+    /* move the cursor at caller's side while going through the input */
+    for (; (*ppos - buf < length) && **ppos; (*ppos)++) {
+	/* state transition (see above) */
+	switch (state) {
+	    case PGS_INIT:
+		if ('#' == **ppos)
+		    state = PGS_COMMENT;
+		else if (!isspace((unsigned char) **ppos))
+		    state = PGS_DATA;
+		break;
+
+	    default:
+		if ('\n' == **ppos)
+		    state = PGS_INIT;
+	};
+
+	if (PGS_COMMENT == state)
+	    /* skip comment */
+	    continue;
+
+	switch (**ppos) {
+	    case '}':
+		message(MESS_ERROR, "%s:%d unexpected } (missing previous '{')\n", configFile, lineNum);
+		free(globString);
+		return NULL;
+
+	    case '{':
+		/* NUL-terminate globString */
+		assert(globStringPos < globStringAlloc);
+		globString[globStringPos] = '\0';
+		return globString;
+
+	    default:
+		break;
+	}
+
+	/* grow the output buffer if needed */
+	if (globStringPos + 2 > globStringAlloc) {
+	    char *ptr;
+	    globStringAlloc += GLOB_STR_REALLOC_STEP;
+	    ptr = realloc(globString, globStringAlloc);
+	    if (!ptr) {
+		/* out of memory */
+		free(globString);
+		return NULL;
+	    }
+	    globString = ptr;
+	}
+
+	/* copy a single character */
+	globString[globStringPos++] = **ppos;
+    }
+
+    /* premature end of input */
+    message(MESS_ERROR, "%s:%d missing '{' after log files definition\n", configFile, lineNum);
+    free(globString);
+    return NULL;
+}
+
 static int globerr(const char *pathname, int theerr)
 {
+    (void) pathname;
+
     /* A missing directory is not an error, so return 0 */
     if (theerr == ENOTDIR)
         return 0;
@@ -913,10 +998,6 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					newlog->flags |= LOG_FLAG_COMPRESS;
 				} else if (!strcmp(key, "nocompress")) {
 					newlog->flags &= ~LOG_FLAG_COMPRESS;
-				} else if (!strcmp(key, "compress")) {
-					newlog->flags |= LOG_FLAG_COMPRESS;
-				} else if (!strcmp(key, "nocompress")) {
-					newlog->flags &= ~LOG_FLAG_COMPRESS;
 				} else if (!strcmp(key, "delaycompress")) {
 					newlog->flags |= LOG_FLAG_DELAYCOMPRESS;
 				} else if (!strcmp(key, "nodelaycompress")) {
@@ -1018,9 +1099,9 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 							!strcmp(key, "maxsize")) {
 					unsigned long long size = 0;
 					char *opt = key;
-							
-					if ((key = isolateValue(configFile, lineNum, opt, &start,
-							&buf, length)) != NULL) {
+
+					key = isolateValue(configFile, lineNum, opt, &start, &buf, length);
+					if (key && key[0]) {
 						int l = strlen(key) - 1;
 						if (key[l] == 'k' || key[l] == 'K') {
 							key[l] = '\0';
@@ -1081,7 +1162,25 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				} else if (!strcmp(key, "monthly")) {
 					newlog->criterium = ROT_MONTHLY;
 				} else if (!strcmp(key, "weekly")) {
+					unsigned weekday;
+					char tmp;
 					newlog->criterium = ROT_WEEKLY;
+					free(key);
+					key = isolateLine(&start, &buf, length);
+					if (key == NULL || key[0] == '\0') {
+						/* default to Sunday if no argument was given */
+						newlog->weekday = 0;
+						continue;
+					}
+
+					if (1 == sscanf(key, "%u%c", &weekday, &tmp) && weekday <= 7) {
+						/* use the selected weekday, 7 means "once per week" */
+						newlog->weekday = weekday;
+						continue;
+					}
+					message(MESS_ERROR, "%s:%d bad weekly directive '%s'\n",
+							configFile, lineNum, key);
+					goto error;
 				} else if (!strcmp(key, "yearly")) {
 					newlog->criterium = ROT_YEARLY;
 				} else if (!strcmp(key, "rotate")) {
@@ -1285,17 +1384,21 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 							&buf, length)) != NULL) {
 
 						message(MESS_DEBUG, "including %s\n", key);
-						if (++recursion_depth > MAX_NESTING) {
+						if (recursion_depth >= MAX_NESTING) {
 							message(MESS_ERROR, "%s:%d include nesting too deep\n",
 									configFile, lineNum);
-							--recursion_depth;
-							goto error;
+							logerror = 1;
+							continue;
 						}
-						if (readConfigPath(key, newlog)) {
-							--recursion_depth;
-							goto error;
-						}
+
+						++recursion_depth;
+						rv = readConfigPath(key, newlog);
 						--recursion_depth;
+
+						if (rv) {
+							logerror = 1;
+							continue;
+						}
 					}
 					else continue;
 				} else if (!strcmp(key, "olddir")) {
@@ -1342,13 +1445,6 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						RAISE_ERROR();
 					}
 
-					if (access(newlog->compress_prog, X_OK)) {
-						message(MESS_ERROR,
-							"%s:%d compression program %s is not an executable file\n",
-							configFile, lineNum, newlog->compress_prog);
-						RAISE_ERROR();
-					}
-
 					message(MESS_DEBUG, "compress_prog is now %s\n",
 						newlog->compress_prog);
 
@@ -1357,6 +1453,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					   as listed in compress_cmd_list */
 					for(i = 0; i < compress_cmd_list_size; i++) {
 						if (!strcmp(compress_cmd_list[i].cmd, compresscmd_base)) {
+							freeLogItem (compress_ext);
 							newlog->compress_ext = strdup((char *)compress_cmd_list[i].ext);
 							message(MESS_DEBUG, "compress_ext was changed to %s\n", newlog->compress_ext);
 							break;
@@ -1370,13 +1467,6 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						(newlog->uncompress_prog =
 							readPath(configFile, lineNum, "uncompress",
 								&start, &buf, length))) {
-						RAISE_ERROR();
-					}
-
-					if (access(newlog->uncompress_prog, X_OK)) {
-						message(MESS_ERROR,
-							"%s:%d uncompression program %s is not an executable file\n",
-							configFile, lineNum, newlog->uncompress_prog);
 						RAISE_ERROR();
 					}
 
@@ -1434,7 +1524,8 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
                                                                            || *start == '~'
 #endif
                                                                            ) {
-				char *key;
+				char *glob_string;
+				size_t glob_count;
 				in_config = 0;
 				if (newlog != defConfig) {
 					message(MESS_ERROR, "%s:%d unexpected log filename\n",
@@ -1457,43 +1548,29 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				if ((newlog = newLogInfo(defConfig)) == NULL)
 					goto error;
 
-				endtag = start;
-				while (endtag - buf < length && *endtag != '{' && *endtag != '}' && *endtag != '\0') {
-					endtag++;}
-				if (endtag - buf > length)
-					continue;
-				if (*endtag == '}') {
-					message(MESS_ERROR, "%s:%d unexpected } (missing previous '{')\n", configFile,
-						lineNum);
-					goto error;
-				}
-				if (*endtag == '{') {
-					in_config = 1;
-				}
-				else {
-					message(MESS_ERROR, "%s:%d missing '{' after log files definition\n", configFile,
-						lineNum);
-					goto error;
-				}
-				key = strndup(start, endtag - start);
-				start = endtag;
+				glob_string = parseGlobString(configFile, lineNum, buf, length, &start);
+				if (glob_string)
+				    	in_config = 1;
+				else
+				    	/* error already printed */
+				    	goto error;
 
-				if (poptParseArgvString(key, &argc, &argv)) {
+				if (poptParseArgvString(glob_string, &argc, &argv)) {
 				message(MESS_ERROR, "%s:%d error parsing filename\n",
 					configFile, lineNum);
-				free(key);
+				free(glob_string);
 				goto error;
 				} else if (argc < 1) {
 				message(MESS_ERROR,
 					"%s:%d { expected after log file name(s)\n",
 					configFile, lineNum);
-				free(key);
+				free(glob_string);
 				goto error;
 				}
 
 				newlog->files = NULL;
 				newlog->numFiles = 0;
-				for (argNum = 0; argNum < argc && logerror != 1; argNum++) {
+				for (argNum = 0; argNum < argc; argNum++) {
 				if (globerr_msg) {
 					free(globerr_msg);
 					globerr_msg = NULL;
@@ -1525,9 +1602,9 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 									globResult.
 									gl_pathc));
 
-				for (i = 0; i < globResult.gl_pathc; i++) {
+				for (glob_count = 0; glob_count < globResult.gl_pathc; glob_count++) {
 					/* if we glob directories we can get false matches */
-					if (!lstat(globResult.gl_pathv[i], &sb) &&
+					if (!lstat(globResult.gl_pathv[glob_count], &sb) &&
 					S_ISDIR(sb.st_mode)) {
 						continue;
 					}
@@ -1536,11 +1613,11 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						log = log->list.tqe_next) {
 					for (k = 0; k < log->numFiles; k++) {
 						if (!strcmp(log->files[k],
-							globResult.gl_pathv[i])) {
+							globResult.gl_pathv[glob_count])) {
 						message(MESS_ERROR,
 							"%s:%d duplicate log entry for %s\n",
 							configFile, lineNum,
-							globResult.gl_pathv[i]);
+							globResult.gl_pathv[glob_count]);
 						logerror = 1;
 						goto duperror;
 						}
@@ -1548,14 +1625,14 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					}
 
 					newlog->files[newlog->numFiles] =
-					strdup(globResult.gl_pathv[i]);
+					strdup(globResult.gl_pathv[glob_count]);
 					newlog->numFiles++;
 				}
 		duperror:
 				globfree(&globResult);
 				}
 
-				newlog->pattern = key;
+				newlog->pattern = glob_string;
 
 				free(argv);
 
@@ -1583,15 +1660,17 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 			if (newlog->oldDir) {
 				for (i = 0; i < newlog->numFiles; i++) {
 					char *ld;
-					int rv;
-					dirName = ourDirName(newlog->files[i]);
+					char *dirpath;
+
+					dirpath = strdup(newlog->files[i]);
+					dirName = dirname(dirpath);
 					if (stat(dirName, &sb2)) {
 						if (!(newlog->flags & LOG_FLAG_MISSINGOK)) {
 							message(MESS_ERROR,
 								"%s:%d error verifying log file "
 								"path %s: %s\n", configFile, lineNum,
 								dirName, strerror(errno));
-							free(dirName);
+							free(dirpath);
 							goto error;
 						}
 						else {
@@ -1601,13 +1680,13 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 								"but missingok is set, so this is not an error.\n",
 								configFile, lineNum,
 								dirName, strerror(errno));
-							free(dirName);
+							free(dirpath);
 							continue;
 						}
 					}
 					ld = alloca(strlen(dirName) + strlen(newlog->oldDir) + 2);
 					sprintf(ld, "%s/%s", dirName, newlog->oldDir);
-					free(dirName);
+					free(dirpath);
 
 					if (newlog->oldDir[0] != '/') {
 						dirName = ld;
@@ -1616,11 +1695,22 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						dirName = newlog->oldDir;
 					}
 
-					rv = stat(dirName, &sb);
-					if (rv) {
+					if (stat(dirName, &sb)) {
 						if (errno == ENOENT && newlog->flags & LOG_FLAG_OLDDIRCREATE) {
-							if (mkpath(dirName, newlog->olddirMode,
-								newlog->olddirUid, newlog->olddirGid)) {
+							int ret;
+							if (newlog->flags & LOG_FLAG_SU) {
+								if (switch_user(newlog->suUid, newlog->suGid) != 0) {
+									goto error;
+								}
+							}
+							ret = mkpath(dirName, newlog->olddirMode,
+								newlog->olddirUid, newlog->olddirGid);
+							if (newlog->flags & LOG_FLAG_SU) {
+								if (switch_user_back() != 0) {
+									goto error;
+								}
+							}
+							if (ret) {
 								goto error;
 							}
 						}
@@ -1756,6 +1846,10 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				key = NULL;
 			}
 			break;
+		default:
+			message(MESS_DEBUG,
+				"%s: %d: readConfigFile() unknown state\n",
+				configFile, lineNum);
 	}
 	if (key) {
 		free(key);
@@ -1776,7 +1870,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 
 	munmap(buf, (size_t) length);
 	close(fd);
-    return 0;
+    return logerror;
 error:
 	/* free is a NULL-safe operation */
 	free(key);
