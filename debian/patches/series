@@ -3,3 +3,4 @@ taboo-716649.patch
 fix-test-breakage.patch
 fix-test-pagesize.patch
 0007-logrotate.service-add-hardening-options.patch
+0007-skip-cronjob-when-running-with-systemd.patch

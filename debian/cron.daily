@@ -1,5 +1,1 @@
-#!/bin/sh
-
-
-test -x /usr/sbin/logrotate -a ! -d /lib/systemd/system || exit 0
-/usr/sbin/logrotate /etc/logrotate.conf
+../examples/logrotate.cron
