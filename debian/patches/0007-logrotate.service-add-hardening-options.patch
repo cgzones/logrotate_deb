@@ -7,7 +7,7 @@ Subject: logrotate.service: add hardening options
  1 file changed, 11 insertions(+)
 
 diff --git a/examples/logrotate.service b/examples/logrotate.service
-index e276878..b46da26 100644
+index e276878..a88cb38 100644
 --- a/examples/logrotate.service
 +++ b/examples/logrotate.service
 @@ -6,6 +6,17 @@ ConditionACPower=true

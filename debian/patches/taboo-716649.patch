@@ -4,8 +4,8 @@ Subject: taboo-716649
 
 ===================================================================
 ---
- config.c    | 2 ++
- logrotate.8 | 2 ++
+ config.c       | 2 ++
+ logrotate.8.in | 2 ++
  2 files changed, 4 insertions(+)
 
 diff --git a/config.c b/config.c
@@ -22,10 +22,10 @@ index 037d593..c973bc3 100644
  	".dpkg-new",
  	".dpkg-old",
  	".rhn-cfg-tmp-*",
-diff --git a/logrotate.8 b/logrotate.8
-index dd22344..4503a17 100644
---- a/logrotate.8
-+++ b/logrotate.8
+diff --git a/logrotate.8.in b/logrotate.8.in
+index d21bf2c..840c960 100644
+--- a/logrotate.8.in
++++ b/logrotate.8.in
 @@ -576,7 +576,9 @@ is replaced. At startup, the taboo extension list
  .IR ,v ,
  .IR .cfsaved ,

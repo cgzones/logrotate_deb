@@ -7,22 +7,13 @@ Patches from: J S Bygott <jsb_no_spm@jsbygott.fsnet.co.uk>
 
 General fixes to manpages.
 ---
- logrotate.8 | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ logrotate.8.in | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/logrotate.8 b/logrotate.8
-index 3f3479a..dd22344 100644
---- a/logrotate.8
-+++ b/logrotate.8
-@@ -77,7 +77,7 @@ and mail it to the recipient. The default mail command is
- \fB\-s\fR, \fB\-\-state\fR \fIstatefile\fR
- Tells \fBlogrotate\fR to use an alternate state file.  This is useful
- if logrotate is being run as a different user for various sets of
--log files.  The default state file is \fI/var/lib/logrotate.status\fR.
-+log files.  The default state file is \fI/var/lib/logrotate/status\fR.
- 
- .TP
- \fB\-\-usage\fR
+diff --git a/logrotate.8.in b/logrotate.8.in
+index 951e406..d21bf2c 100644
+--- a/logrotate.8.in
++++ b/logrotate.8.in
 @@ -626,10 +626,14 @@ left l l.
  .BR strtoul (3),
  <https://github.com/logrotate/logrotate>
