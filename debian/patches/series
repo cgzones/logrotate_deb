@@ -4,3 +4,4 @@ fix-test-breakage.patch
 fix-test-pagesize.patch
 0007-logrotate.service-add-hardening-options.patch
 0007-skip-cronjob-when-running-with-systemd.patch
+0007-set-version-to-avoid-script-result-UNKNOWN.patch
