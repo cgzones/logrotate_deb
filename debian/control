@@ -4,9 +4,10 @@ Priority: important
 Maintainer: Christian Göttsche <cgzones@googlemail.com>
 Build-Depends: libpopt-dev, debhelper (>= 10),
  libselinux1-dev [linux-any], libacl1-dev [linux-any]
-Vcs-Svn: http://svn.fedorahosted.org/svn/logrotate/
+Vcs-Browser: https://github.com/cgzones/logrotate_deb
+Vcs-Git: https://github.com/cgzones/logrotate_deb
 Homepage: https://github.com/logrotate/logrotate
-Standards-Version: 4.0.0.0
+Standards-Version: 4.1.0
 
 Package: logrotate
 Architecture: any

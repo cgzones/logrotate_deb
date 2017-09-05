@@ -6,7 +6,10 @@ logrotate (3.12.3-1) unstable; urgency=medium
     - Switch to debhelper 10
     - Support logrotation triggered by systemd timer
  
-    - control: Set myself as maintainer   
+    - control:
+      + Set myself as maintainer
+      + Bump standards version to 4.1.0
+      + Update vcs fields
     - cron.daily: Align with upstream
     - gbp.conf: Add gbp configuration
     - logrotate.conf: align with upstream
