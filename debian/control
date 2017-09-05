@@ -1,7 +1,7 @@
 Source: logrotate
 Section: admin
 Priority: important
-Maintainer: Paul Martin <pm@debian.org>
+Maintainer: Christian Göttsche <cgzones@googlemail.com>
 Build-Depends: libpopt-dev, debhelper (>= 10),
  libselinux1-dev [linux-any], libacl1-dev [linux-any]
 Vcs-Svn: http://svn.fedorahosted.org/svn/logrotate/
