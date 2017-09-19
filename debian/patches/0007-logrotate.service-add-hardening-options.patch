@@ -3,14 +3,14 @@ Date: Wed, 30 Aug 2017 18:35:09 +0200
 Subject: logrotate.service: add hardening options
 
 ---
- examples/logrotate.service | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ examples/logrotate.service | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/examples/logrotate.service b/examples/logrotate.service
-index e276878..a88cb38 100644
+index e276878..19b0a34 100644
 --- a/examples/logrotate.service
 +++ b/examples/logrotate.service
-@@ -6,6 +6,17 @@ ConditionACPower=true
+@@ -6,6 +6,18 @@ ConditionACPower=true
  [Service]
  Type=oneshot
  ExecStart=/usr/sbin/logrotate /etc/logrotate.conf
@@ -24,7 +24,8 @@ index e276878..a88cb38 100644
 +ProtectSystem=full
 +ProtectHome=true
 +PrivateDevices=true
-+ProtectKernelTunables=true
++# breaks SELinux support
++#ProtectKernelTunables=true
 +ProtectControlGroups=true
 +ProtectKernelModules=true
 +PrivateNetwork=true
