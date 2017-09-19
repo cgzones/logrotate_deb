@@ -1,0 +1,20 @@
+From: =?utf-8?q?Christian_G=C3=B6ttsche?= <cgzones@googlemail.com>
+Date: Tue, 19 Sep 2017 08:43:26 +0200
+Subject: logrotate.c: add SELinux debug message
+
+---
+ logrotate.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/logrotate.c b/logrotate.c
+index 3fcbf7c..5082dce 100644
+--- a/logrotate.c
++++ b/logrotate.c
+@@ -354,6 +354,7 @@ static void restoreSecCtx(void **pPrevCtx)
+ 	message(MESS_ERROR, "setting default context to %s: %s\n", prevCtx,
+ 		strerror(errno));
+ 
++    message(MESS_DEBUG, "restore default create context to %s\n", prevCtx);
+     /* free the memory allocated to save the security context */
+     freecon(prevCtx);
+     *pPrevCtx = NULL;

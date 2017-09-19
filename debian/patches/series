@@ -5,3 +5,6 @@ fix-test-pagesize.patch
 0007-logrotate.service-add-hardening-options.patch
 0007-skip-cronjob-when-running-with-systemd.patch
 0007-set-version-to-avoid-script-result-UNKNOWN.patch
+0008-logrotate.c-add-compile-time-configs-to-version-info.patch
+0009-check-several-more-warnings.patch
+0010-logrotate.c-add-SELinux-debug-message.patch

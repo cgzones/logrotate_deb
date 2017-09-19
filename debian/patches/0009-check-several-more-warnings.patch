@@ -1,0 +1,72 @@
+From: =?utf-8?q?Christian_G=C3=B6ttsche?= <cgzones@googlemail.com>
+Date: Tue, 19 Sep 2017 08:19:50 +0200
+Subject: check several more warnings
+
+---
+ configure.ac | 2 +-
+ log.c        | 2 ++
+ logrotate.c  | 5 +++--
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index adbab4b..78a1c5c 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -178,7 +178,7 @@ AC_SUBST(ROOT_UID)
+ AC_CHECK_FUNCS([asprintf fork madvise qsort strndup strptime vfork vsyslog])
+ AC_CONFIG_HEADERS([config.h])
+ 
+-AM_CFLAGS="-Wall"
++AM_CFLAGS="-Wall -Wextra -Wmissing-format-attribute -Wmissing-noreturn -Wpointer-arith -Wshadow -Wstrict-prototypes -Wundef -Wunused -Wwrite-strings"
+ AC_ARG_ENABLE([werror],
+         [AS_HELP_STRING([--enable-werror],
+                 [Treat warnings as errors (default: warnings are not errors)])],
+diff --git a/log.c b/log.c
+index 887422b..3a84d97 100644
+--- a/log.c
++++ b/log.c
+@@ -37,6 +37,7 @@ void logToSyslog(int enable) {
+ #endif
+ }
+ 
++__attribute__((format (printf, 3, 0)))
+ static void log_once(FILE *where, int level, const char *format, va_list args)
+ {
+ 	switch (level) {
+@@ -53,6 +54,7 @@ static void log_once(FILE *where, int level, const char *format, va_list args)
+ 	fflush(where);
+ }
+ 
++__attribute__((format (printf, 2, 3)))
+ void message(int level, const char *format, ...)
+ {
+ 	va_list args;
+diff --git a/logrotate.c b/logrotate.c
+index 846c830..3fcbf7c 100644
+--- a/logrotate.c
++++ b/logrotate.c
+@@ -1430,6 +1430,7 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
+ 						strncat(dext_pattern, "[0-9][0-9]",
+ 								sizeof(dext_pattern) - strlen(dext_pattern) - 1);
+ 						j += 10; /* strlen("[0-9][0-9]") */
++						/* FALLTHRU */
+ 					case 'm':
+ 					case 'd':
+ 					case 'H':
+@@ -1576,14 +1577,14 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
+ 	     * remember the second and so on */
+ 	    struct stat fst_buf;
+ 	    int mail_out = -1;
+-	    ssize_t glob_count;
++	    size_t glob_count;
+ 	    /* remove the first (n - rotateCount) matches
+ 	     * no real rotation needed, since the files have
+ 	     * the date in their name */
+ 		sortGlobResult(&globResult, strlen(rotNames->dirName) + 1 + strlen(rotNames->baseName), dformat);
+ 	    for (glob_count = 0; glob_count < globResult.gl_pathc; glob_count++) {
+ 		if (!stat((globResult.gl_pathv)[glob_count], &fst_buf)) {
+-		    if (((globResult.gl_pathc >= rotateCount) && (glob_count <= (globResult.gl_pathc - rotateCount)))
++		    if (((globResult.gl_pathc >= (unsigned int)rotateCount) && (glob_count <= (globResult.gl_pathc - rotateCount)))
+ 			|| ((log->rotateAge > 0)
+ 			    &&
+ 			    (((nowSecs - fst_buf.st_mtime) / DAY_SECONDS)
