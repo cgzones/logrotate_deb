@@ -1,0 +1,22 @@
+From: =?utf-8?q?Christian_G=C3=B6ttsche?= <cgzones@googlemail.com>
+Date: Tue, 19 Sep 2017 19:32:45 +0200
+Subject: fix spelling, found by scan-build
+
+logrotate.c:251:15: warning: Result of 'malloc' is converted to a pointer of type 'struct logStates', which is incompatible with sizeof operand type 'struct logState'
+---
+ logrotate.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/logrotate.c b/logrotate.c
+index 5082dce..4d0e9ff 100644
+--- a/logrotate.c
++++ b/logrotate.c
+@@ -248,7 +248,7 @@ static int allocateHash(unsigned int hs)
+ 	}
+ 
+ 	for (i = 0; i < hs; i++) {
+-		states[i] = malloc(sizeof(struct logState));
++		states[i] = malloc(sizeof(struct logStates));
+ 		if (states[i] == NULL) {
+ 			message(MESS_ERROR, "could not allocate memory for "
+ 				"hash element\n");

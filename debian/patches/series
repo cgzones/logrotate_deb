@@ -8,3 +8,4 @@ fix-test-pagesize.patch
 0008-logrotate.c-add-compile-time-configs-to-version-info.patch
 0009-check-several-more-warnings.patch
 0010-logrotate.c-add-SELinux-debug-message.patch
+0011-fix-spelling-found-by-scan-build.patch
