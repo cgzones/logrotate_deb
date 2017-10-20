@@ -63,9 +63,9 @@ output logged to that file is the same as when running \fBlogrotate\fR with
 .TP
 \fB\-m\fR, \fB\-\-mail\fR \fIcommand\fR
 Tells \fBlogrotate\fR which command to use when mailing logs. This
-command should accept two arguments:
+command should accept the following arguments:
 .IP
-1) the subject of the message
+1) the subject of the message given with '-s subject'
 .br
 2) the recipient.
 .IP
@@ -576,6 +576,8 @@ is replaced. At startup, the taboo extension list
 .IR ,v ,
 .IR .cfsaved ,
 .IR .disabled ,
+.IR .dpkg\-bak ,
+.IR .dpkg\-del ,
 .IR .dpkg\-dist ,
 .IR .dpkg\-new ,
 .IR .dpkg\-old ,
@@ -600,7 +602,7 @@ is replaced. At startup, the taboo pattern list is empty.
 \fBweekly\fR [\fIweekday\fR]
 Log files are rotated once each \fIweekday\fR, or if the date is advanced by at
 least 7 days since the last rotation (while ignoring the exact time).  The
-\fIweekday\fR intepretation is following:  0 means Sunday, 1 means Monday, ...,
+\fIweekday\fR interpretation is following:  0 means Sunday, 1 means Monday, ...,
 6 means Saturday; the special value 7 means each 7 days, irrespectively of
 weekday.  Defaults to 0 if the \fIweekday\fR argument is omitted.
 
