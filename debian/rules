@@ -49,7 +49,7 @@ override_dh_auto_clean:
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
   ifeq ($(DEB_HOST_ARCH_OS),linux)
-	cd test ; ./test
+	make test
   endif
 endif
 

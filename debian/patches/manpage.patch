@@ -11,10 +11,10 @@ General fixes to manpages.
  1 file changed, 4 insertions(+)
 
 diff --git a/logrotate.8.in b/logrotate.8.in
-index 951e406..d21bf2c 100644
+index f5fac8a..a6fa81b 100644
 --- a/logrotate.8.in
 +++ b/logrotate.8.in
-@@ -626,10 +626,14 @@ left l l.
+@@ -628,10 +628,14 @@ left l l.
  .BR strtoul (3),
  <https://github.com/logrotate/logrotate>
  
