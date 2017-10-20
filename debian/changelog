@@ -8,7 +8,7 @@ logrotate (3.13.0-1) UNRELEASED; urgency=medium
  
     - control:
       + Set myself as maintainer
-      + Bump standards version to 4.1.0
+      + Bump standards version to 4.1.1
       + Update vcs fields
     - cron.daily: Align with upstream
     - gbp.conf: Add gbp configuration
