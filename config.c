@@ -130,6 +130,8 @@ static const char *defTabooExts[] = {
 	",v",
 	".cfsaved",
 	".disabled",
+	".dpkg-bak",
+	".dpkg-del",
 	".dpkg-dist",
 	".dpkg-new",
 	".dpkg-old",
@@ -254,15 +256,50 @@ static char *readPath(const char *configFile, int lineNum, const char *key,
 	return NULL;
 }
 
+/* set *pUid to UID of the given user, return non-zero on failure */
+static int resolveUid(const char *userName, uid_t *pUid)
+{
+	struct passwd *pw;
+#ifdef __CYGWIN__
+	if (strcmp(userName, "root") == 0) {
+		*pUid = 0;
+		return 0;
+	}
+#endif
+	pw = getpwnam(userName);
+	if (!pw)
+		return -1;
+	*pUid = pw->pw_uid;
+	endpwent();
+	return 0;
+}
+
+/* set *pGid to GID of the given group, return non-zero on failure */
+static int resolveGid(const char *groupName, gid_t *pGid)
+{
+	struct group *gr;
+#ifdef __CYGWIN__
+	if (strcmp(groupName, "root") == 0) {
+		*pGid = 0;
+		return 0;
+	}
+#endif
+	gr = getgrnam(groupName);
+	if (!gr)
+		return -1;
+	*pGid = gr->gr_gid;
+	endgrent();
+	return 0;
+}
+
 static int readModeUidGid(const char *configFile, int lineNum, char *key,
-							const char *directive, mode_t *mode, uid_t *uid,
-							gid_t *gid) {
+			  const char *directive, mode_t *mode, uid_t *pUid,
+			  gid_t *pGid)
+{
 	char u[200], g[200];
 	unsigned int m;
 	char tmp;
 	int rc;
-	struct group *group;
-	struct passwd *pw = NULL;
 
 	if (!strcmp("su", directive))
 	    /* do not read <mode> for the 'su' directive */
@@ -291,24 +328,18 @@ static int readModeUidGid(const char *configFile, int lineNum, char *key,
 	}
 
 	if (rc > 1) {
-		pw = getpwnam(u);
-		if (!pw) {
+		if (resolveUid(u, pUid) != 0) {
 			message(MESS_ERROR, "%s:%d unknown user '%s'\n",
 				configFile, lineNum, u);
 			return -1;
 		}
-		*uid = pw->pw_uid;
-		endpwent();
 	}
 	if (rc > 2) {
-		group = getgrnam(g);
-		if (!group) {
+		if (resolveGid(g, pGid) != 0) {
 			message(MESS_ERROR, "%s:%d unknown group '%s'\n",
 				configFile, lineNum, g);
 			return -1;
 		}
-		*gid = group->gr_gid;
-		endgrent();
 	}
 
 	return 0;
@@ -440,7 +471,7 @@ static void copyLogInfo(struct logInfo *to, struct logInfo *from)
 	to->oldDir = strdup(from->oldDir);
     to->criterium = from->criterium;
     to->weekday = from->weekday;
-    to->threshhold = from->threshhold;
+    to->threshold = from->threshold;
     to->minsize = from->minsize;
     to->maxsize = from->maxsize;
     to->rotateCount = from->rotateCount;
@@ -658,7 +689,7 @@ int readAllConfigPaths(const char **paths)
 		.numFiles = 0,
 		.oldDir = NULL,
 		.criterium = ROT_SIZE,
-		.threshhold = 1024 * 1024,
+		.threshold = 1024 * 1024,
 		.minsize = 0,
 		.maxsize = 0,
 		.rotateCount = 0,
@@ -1130,7 +1161,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						}
 						if (!strncmp(opt, "size", 4)) {
 						  newlog->criterium = ROT_SIZE;
-						  newlog->threshhold = size;
+						  newlog->threshold = size;
 						} else if (!strncmp(opt, "maxsize", 7)) {
 						  newlog->maxsize = size;
 						} else {
@@ -1158,7 +1189,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					newlog->criterium = ROT_HOURLY;
 				} else if (!strcmp(key, "daily")) {
 					newlog->criterium = ROT_DAYS;
-					newlog->threshhold = 1;
+					newlog->threshold = 1;
 				} else if (!strcmp(key, "monthly")) {
 					newlog->criterium = ROT_MONTHLY;
 				} else if (!strcmp(key, "weekly")) {
@@ -1449,7 +1480,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						newlog->compress_prog);
 
 					compresscmd_base = strdup(basename(newlog->compress_prog));
-					/* we check whether we changed the compress_cmd. In case we use the apropriate extension
+					/* we check whether we changed the compress_cmd. In case we use the appropriate extension
 					   as listed in compress_cmd_list */
 					for(i = 0; i < compress_cmd_list_size; i++) {
 						if (!strcmp(compress_cmd_list[i].cmd, compresscmd_base)) {

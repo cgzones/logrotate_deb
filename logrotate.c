@@ -85,7 +85,7 @@ struct compData {
 	const char *dformat;
 };
 
-static struct logStates {
+static struct logStateList {
 	LIST_HEAD(stateSet, logState) head;
 } **states;
 
@@ -97,8 +97,6 @@ static const char *mailCommand = DEFAULT_MAIL_COMMAND;
 static time_t nowSecs = 0;
 static uid_t save_euid;
 static gid_t save_egid;
-
-static int shred_file(int fd, char *filename, struct logInfo *log);
 
 static int globerr(const char *pathname, int theerr)
 {
@@ -116,18 +114,18 @@ static int globerr(const char *pathname, int theerr)
 static struct compData _compData;
 
 static int compGlobResult(const void *result1, const void *result2)  {
-	struct tm time;
+	struct tm time_tmp;
 	time_t t1, t2;
 	const char *r1 = *(const char **)(result1);
 	const char *r2 = *(const char **)(result2);
 
-	memset(&time, 0, sizeof(struct tm));
-	strptime(r1 + _compData.prefix_len, _compData.dformat, &time);
-	t1 = mktime(&time);
+	memset(&time_tmp, 0, sizeof(struct tm));
+	strptime(r1 + _compData.prefix_len, _compData.dformat, &time_tmp);
+	t1 = mktime(&time_tmp);
 
-	memset(&time, 0, sizeof(struct tm));
-	strptime(r2 + _compData.prefix_len, _compData.dformat, &time);
-	t2 = mktime(&time);
+	memset(&time_tmp, 0, sizeof(struct tm));
+	strptime(r2 + _compData.prefix_len, _compData.dformat, &time_tmp);
+	t2 = mktime(&time_tmp);
 
 	if (t1 < t2) return -1;
 	if (t1 > t2) return  1;
@@ -240,7 +238,7 @@ static int allocateHash(unsigned int hs)
 	message(MESS_DEBUG, "Allocating hash table for state file, size %d entries\n",
 			hs);
 
-	states = calloc(hs, sizeof(struct logStates *));
+	states = calloc(hs, sizeof(struct logStateList *));
 	if (states == NULL) {
 		message(MESS_ERROR, "could not allocate memory for "
 				"hash table\n");
@@ -248,7 +246,7 @@ static int allocateHash(unsigned int hs)
 	}
 
 	for (i = 0; i < hs; i++) {
-		states[i] = malloc(sizeof(struct logState));
+		states[i] = malloc(sizeof *states[0]);
 		if (states[i] == NULL) {
 			message(MESS_ERROR, "could not allocate memory for "
 				"hash element\n");
@@ -276,6 +274,21 @@ static int hashIndex(const char *fn)
 	}
 
 	return hash % hashSize;
+}
+
+/* safe implementation of dup2(oldfd, nefd) followed by close(oldfd) */
+static int movefd(int oldfd, int newfd)
+{
+    int rc;
+    if (oldfd == newfd)
+	/* avoid accidental close of newfd in case it is equal to oldfd */
+	return 0;
+
+    rc = dup2(oldfd, newfd);
+    if (rc == 0)
+	close(oldfd);
+
+    return rc;
 }
 
 static int setSecCtx(int fdSrc, const char *src, void **pPrevCtx)
@@ -585,7 +598,7 @@ static int shred_file(int fd, char *filename, struct logInfo *log)
 	}
 
 	if (!(log->flags & LOG_FLAG_SHRED)) {
-		return unlink(filename);
+		goto unlink_file;
 	}
 
 	message(MESS_DEBUG, "Using shred to remove the file %s\n", filename);
@@ -608,8 +621,7 @@ static int shred_file(int fd, char *filename, struct logInfo *log)
 	fullCommand[id++] = NULL;
 
 	if (!fork()) {
-		dup2(fd, 1);
-		close(fd);
+	    	movefd(fd, STDOUT_FILENO);
 
 		if (switch_user_permanently(log) != 0) {
 			exit(1);
@@ -628,7 +640,17 @@ static int shred_file(int fd, char *filename, struct logInfo *log)
 
 	/* We have to unlink it after shred anyway,
 	 * because it doesn't remove the file itself */
-	return unlink(filename);
+
+unlink_file:
+	if (unlink(filename) == 0)
+		return 0;
+	if (errno != ENOENT)
+		return 1;
+
+	/* unlink of log file that no longer exists is not a fatal error */
+	message(MESS_ERROR, "error unlinking log file %s: %s\n", filename,
+			strerror(errno));
+	return 0;
 }
 
 static int removeLogFile(char *name, struct logInfo *log)
@@ -723,6 +745,7 @@ static int compressLogFile(char *name, struct logInfo *log, struct stat *sb)
 	return 1;
     }
 
+    /* pipe used to capture stderr of the compress process */
 	if (pipe(compressPipe) < 0) {
 		message(MESS_ERROR, "error opening pipe for compress: %s",
 				strerror(errno));
@@ -732,13 +755,12 @@ static int compressLogFile(char *name, struct logInfo *log, struct stat *sb)
 	}
 
     if (!fork()) {
-	dup2(inFile, 0);
-	close(inFile);
-	dup2(outFile, 1);
-	close(outFile);
-	dup2(compressPipe[1], 2);
+	/* close read end of pipe in the child process */
 	close(compressPipe[0]);
-	close(compressPipe[1]);
+
+	movefd(inFile, STDIN_FILENO);
+	movefd(outFile, STDOUT_FILENO);
+	movefd(compressPipe[1], STDERR_FILENO);
 
 	if (switch_user_permanently(log) != 0) {
 		exit(1);
@@ -751,7 +773,9 @@ static int compressLogFile(char *name, struct logInfo *log, struct stat *sb)
 	exit(1);
     }
 
+    /* close write end of pipe in the parent process */
     close(compressPipe[1]);
+
     while ((i = read(compressPipe[0], buff, sizeof(buff) - 1)) > 0) {
 	if (!error_printed) {
 	    error_printed = 1;
@@ -803,6 +827,7 @@ static int mailLog(struct logInfo *log, char *logFile, const char *mailComm,
     }
 
     if (uncompressCommand) {
+		/* pipe used to capture ouput of the uncompress process */
 		if (pipe(uncompressPipe) < 0) {
 			message(MESS_ERROR, "error opening pipe for uncompress: %s",
 					strerror(errno));
@@ -811,11 +836,12 @@ static int mailLog(struct logInfo *log, char *logFile, const char *mailComm,
 		}
 		if (!(uncompressChild = fork())) {
 			/* uncompress child */
-			dup2(mailInput, 0);
-			close(mailInput);
-			dup2(uncompressPipe[1], 1);
+
+			/* close read end of pipe in the child process */
 			close(uncompressPipe[0]);
-			close(uncompressPipe[1]);
+
+			movefd(mailInput, STDIN_FILENO);
+			movefd(uncompressPipe[1], STDOUT_FILENO);
 
 			if (switch_user_permanently(log) != 0) {
 				exit(1);
@@ -831,9 +857,8 @@ static int mailLog(struct logInfo *log, char *logFile, const char *mailComm,
     }
 
     if (!(mailChild = fork())) {
-	dup2(mailInput, 0);
-	close(mailInput);
-	close(1);
+	movefd(mailInput, STDIN_FILENO);
+	close(STDOUT_FILENO);
 
 	/* mail command runs as root */
 	if (log->flags & LOG_FLAG_SU) {
@@ -871,20 +896,24 @@ static int mailLog(struct logInfo *log, char *logFile, const char *mailComm,
 static int mailLogWrapper(char *mailFilename, const char *mailComm,
 			  int logNum, struct logInfo *log)
 {
-	/* if the log is compressed (and we're not mailing a
-	* file whose compression has been delayed), we need
-	* to uncompress it */
-	if ((log->flags & LOG_FLAG_COMPRESS) && !(log->flags & LOG_FLAG_DELAYCOMPRESS)) {
-		if (mailLog(log, mailFilename, mailComm,
-			log->uncompress_prog, log->logAddress,
-			(log->flags & LOG_FLAG_MAILFIRST) ? log->files[logNum] : mailFilename))
-			return 1;
-	} else {
-		if (mailLog(log, mailFilename, mailComm, NULL,
-			log->logAddress, mailFilename))
-			return 1;
-	}
-	return 0;
+    /* uncompress already compressed log files before mailing them */
+    char *uncompress_prog = (log->flags & LOG_FLAG_COMPRESS)
+	? log->uncompress_prog
+	: NULL;
+
+    char *subject = mailFilename;
+    if (log->flags & LOG_FLAG_MAILFIRST) {
+	if (log->flags & LOG_FLAG_DELAYCOMPRESS)
+	    /* the log we are mailing has not been compressed yet */
+	    uncompress_prog = NULL;
+
+	if (uncompress_prog)
+	    /* use correct subject when mailfirst is enabled */
+	    subject = log->files[logNum];
+    }
+
+    return mailLog(log, mailFilename, mailComm, uncompress_prog,
+	    log->logAddress, subject);
 }
 
 /* Use a heuristic to determine whether stat buffer SB comes from a file
@@ -1194,7 +1223,7 @@ static int findNeedRotating(struct logInfo *log, int logNum, int force)
         state->doRotate = 1;
     }
     else if (log->criterium == ROT_SIZE) {
-	state->doRotate = (sb.st_size >= log->threshhold);
+	state->doRotate = (sb.st_size >= log->threshold);
 	if (!state->doRotate) {
 	message(MESS_DEBUG, "  log does not need rotating "
 		"(log size is below the 'size' threshold)\n");
@@ -1430,6 +1459,7 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
 						strncat(dext_pattern, "[0-9][0-9]",
 								sizeof(dext_pattern) - strlen(dext_pattern) - 1);
 						j += 10; /* strlen("[0-9][0-9]") */
+						/* FALLTHRU */
 					case 'm':
 					case 'd':
 					case 'H':
@@ -1576,14 +1606,14 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
 	     * remember the second and so on */
 	    struct stat fst_buf;
 	    int mail_out = -1;
-	    ssize_t glob_count;
+	    size_t glob_count;
 	    /* remove the first (n - rotateCount) matches
 	     * no real rotation needed, since the files have
 	     * the date in their name */
 		sortGlobResult(&globResult, strlen(rotNames->dirName) + 1 + strlen(rotNames->baseName), dformat);
 	    for (glob_count = 0; glob_count < globResult.gl_pathc; glob_count++) {
 		if (!stat((globResult.gl_pathv)[glob_count], &fst_buf)) {
-		    if (((globResult.gl_pathc >= rotateCount) && (glob_count <= (globResult.gl_pathc - rotateCount)))
+		    if (((globResult.gl_pathc >= (size_t)rotateCount) && (glob_count <= (globResult.gl_pathc - rotateCount)))
 			|| ((log->rotateAge > 0)
 			    &&
 			    (((nowSecs - fst_buf.st_mtime) / DAY_SECONDS)
@@ -1942,7 +1972,7 @@ static int rotateLogSet(struct logInfo *log, int force)
         message(MESS_DEBUG, "hourly ");
         break;
         case ROT_DAYS:
-        message(MESS_DEBUG, "after %jd days ", (intmax_t)log->threshhold);
+        message(MESS_DEBUG, "after %jd days ", (intmax_t)log->threshold);
         break;
         case ROT_WEEKLY:
         message(MESS_DEBUG, "weekly ");
@@ -1954,7 +1984,7 @@ static int rotateLogSet(struct logInfo *log, int force)
         message(MESS_DEBUG, "yearly ");
         break;
         case ROT_SIZE:
-        message(MESS_DEBUG, "%jd bytes ", (intmax_t)log->threshhold);
+        message(MESS_DEBUG, "%jd bytes ", (intmax_t)log->threshold);
         break;
         default:
         message(MESS_DEBUG, "rotateLogSet() does not have case for: %d ", log->criterium);
@@ -2314,6 +2344,9 @@ static int writeState(const char *stateFilename)
 	}
 
 	if (error == 0)
+		error = fflush(f);
+
+	if (error == 0)
 		error = fsync(fdsave);
 
 	if (error == 0)
@@ -2599,7 +2632,23 @@ int main(int argc, const char **argv)
 		}
 		break;
 	case 'V':
-	    fprintf(stderr, "logrotate %s\n", VERSION);
+	    printf("logrotate %s\n", VERSION);
+	    printf("\n");
+	    printf("    Default mail command:       %s\n", DEFAULT_MAIL_COMMAND);
+	    printf("    Default compress command:   %s\n", COMPRESS_COMMAND);
+	    printf("    Default uncompress command: %s\n", UNCOMPRESS_COMMAND);
+	    printf("    Default compress extension: %s\n", COMPRESS_EXT);
+	    printf("    Default state file path:    %s\n", STATEFILE);
+#ifdef WITH_ACL
+	    printf("    ACL support:                yes\n");
+#else
+	    printf("    ACL support:                no\n");
+#endif
+#ifdef WITH_SELINUX
+	    printf("    SELinux support:            yes\n");
+#else
+	    printf("    SELinux support:            no\n");
+#endif
 	    poptFreeContext(optCon);
 	    exit(0);
 	default:

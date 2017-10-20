@@ -1,20 +1,9 @@
 AC_INIT([logrotate],m4_esyscmd([build-aux/git-version-gen --prefix '' .tarball-version]),
 [],[],[https://github.com/logrotate/logrotate])
 
-dnl serial-test not supported prior version 1.12
-m4_define([serial_tests], [
-    m4_esyscmd([automake --version |
-                perl -nae '{@v = split("[.]", $F[-1]);
-                            if ($v[0] >= 1 && $v[1] >= 12)
-                                {print "serial-tests\n";}
-                            exit;}'
-    ])
-])
-
 dnl foreign: Do not require AUTHORS, ChangeLog, NEWS, and README to exist
-dnl serial_tests: Do not hide standard output of our sequential test-suite
 dnl dist-xz: Produce tar.xz version of the release archive
-AM_INIT_AUTOMAKE(foreign dist-xz serial_tests)
+AM_INIT_AUTOMAKE(foreign dist-xz)
 
 # --enable-silent-rules
 m4_ifdef([AM_SILENT_RULES],
@@ -82,7 +71,7 @@ case "$host" in
           DEFAULT_MAIL_COMMAND="/usr/bin/mailx"
           ;;
   *-netbsd*)
-          DEFAULT_MAIL_COMMAND="/usr/bin/mail -s"
+          DEFAULT_MAIL_COMMAND="/usr/bin/mail"
           COMPRESS_COMMAND="/usr/bin/gzip"
           UNCOMPRESS_COMMAND="/usr/bin/gunzip"
           ;;
@@ -110,7 +99,7 @@ AC_SUBST(STATE_FILE_PATH)
 
 AC_ARG_WITH([default-mail-command],
   AC_HELP_STRING([--with-default-mail-command=COMMAND],
-                 [default mail command (e.g. /bin/mail -s)]),
+                 [default mail command (e.g. /bin/mail)]),
   [
     case "$withval" in
       yes|no)
@@ -178,7 +167,7 @@ AC_SUBST(ROOT_UID)
 AC_CHECK_FUNCS([asprintf fork madvise qsort strndup strptime vfork vsyslog])
 AC_CONFIG_HEADERS([config.h])
 
-AM_CFLAGS="-Wall"
+AM_CFLAGS="-Wall -Wextra -Wmissing-format-attribute -Wmissing-noreturn -Wpointer-arith -Wshadow -Wstrict-prototypes -Wundef -Wunused -Wwrite-strings"
 AC_ARG_ENABLE([werror],
         [AS_HELP_STRING([--enable-werror],
                 [Treat warnings as errors (default: warnings are not errors)])],
