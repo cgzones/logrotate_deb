@@ -15,14 +15,13 @@ logrotate (3.13.0-1) UNRELEASED; urgency=medium
     - patches:
       + Refresh patches, drop upstream applied ones
       + configure.ac: set fixed version
-      + add systemd service hardening
     - rules:
       + Enable hardening
       + Add dh_missing --fail-missing
       + Simplify statefile change
       + set correct path for mail command
 
- -- Christian Göttsche <cgzones@googlemail.com>  Fri, 20 Oct 2017 13:05:22 +0200
+ -- Christian Göttsche <cgzones@googlemail.com>  Sat, 21 Oct 2017 11:21:32 +0200
 
 logrotate (3.11.0-0.1) unstable; urgency=low
 
