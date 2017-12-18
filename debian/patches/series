@@ -1,3 +1,4 @@
 manpage.patch
 0007-skip-cronjob-when-running-with-systemd.patch
 0003-fix-spelling.patch
+0004-added-.dpkg-tmp-to-defTabooExts.patch
