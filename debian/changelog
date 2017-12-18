@@ -1,6 +1,6 @@
 logrotate (3.13.0-1) unstable; urgency=medium
 
-  * New upstream version 3.13.0
+  * New upstream version 3.13.0 (Closes: #879262)
 
   * debian:
     - Switch to debhelper 10
@@ -10,17 +10,20 @@ logrotate (3.13.0-1) unstable; urgency=medium
       + Set myself as maintainer
       + Bump standards version to 4.1.1
       + Update vcs fields
+      + add minimal autotest suite
     - cron.daily: Align with upstream
     - logrotate.conf: align with upstream
     - patches:
       + Refresh patches, drop upstream applied ones
+      + spelling fix
+      + add upstream patch about .dpkg-tmp taboo
     - rules:
       + Enable hardening
       + Add dh_missing --fail-missing
       + Simplify statefile change
       + set correct path for mail command
 
- -- Christian Göttsche <cgzones@googlemail.com>  Sat, 21 Oct 2017 11:24:35 +0200
+ -- Christian Göttsche <cgzones@googlemail.com>  Mon, 18 Dec 2017 13:28:48 +0100
 
 logrotate (3.11.0-0.1) unstable; urgency=low
 
