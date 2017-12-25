@@ -2,7 +2,7 @@ Source: logrotate
 Section: admin
 Priority: important
 Maintainer: Christian Göttsche <cgzones@googlemail.com>
-Build-Depends: libpopt-dev, debhelper (>= 10),
+Build-Depends: libpopt-dev, debhelper (>= 11),
  libselinux1-dev [linux-any], libacl1-dev [linux-any]
 Vcs-Browser: https://github.com/cgzones/logrotate_deb
 Vcs-Git: https://github.com/cgzones/logrotate_deb

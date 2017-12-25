@@ -3,7 +3,7 @@ logrotate (3.13.0-1) unstable; urgency=medium
   * New upstream version 3.13.0 (Closes: #879262)
 
   * debian:
-    - Switch to debhelper 10
+    - Switch to debhelper 11
     - Support logrotation triggered by systemd timer
 
     - control:
