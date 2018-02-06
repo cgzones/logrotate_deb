@@ -22,6 +22,7 @@ logrotate (3.13.0-1) unstable; urgency=medium
       + Add dh_missing --fail-missing
       + Simplify statefile change
       + set correct path for mail command
+    - watch: check signature
 
  -- Christian Göttsche <cgzones@googlemail.com>  Mon, 25 Dec 2017 11:30:58 +0100
 
