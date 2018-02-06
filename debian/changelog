@@ -8,7 +8,7 @@ logrotate (3.13.0-1) unstable; urgency=medium
 
     - control:
       + Set myself as maintainer
-      + Bump standards version to 4.1.2
+      + Bump standards version to 4.1.3
       + Update vcs fields
       + add minimal autotest suite
     - cron.daily: Align with upstream
@@ -24,7 +24,7 @@ logrotate (3.13.0-1) unstable; urgency=medium
       + set correct path for mail command
     - watch: check signature
 
- -- Christian Göttsche <cgzones@googlemail.com>  Mon, 25 Dec 2017 11:30:58 +0100
+ -- Christian Göttsche <cgzones@googlemail.com>  Tue, 06 Feb 2018 17:49:46 +0100
 
 logrotate (3.11.0-0.1) unstable; urgency=low
 

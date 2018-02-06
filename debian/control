@@ -7,7 +7,7 @@ Build-Depends: libpopt-dev, debhelper (>= 11),
 Vcs-Browser: https://github.com/cgzones/logrotate_deb
 Vcs-Git: https://github.com/cgzones/logrotate_deb
 Homepage: https://github.com/logrotate/logrotate
-Standards-Version: 4.1.2
+Standards-Version: 4.1.3
 
 Package: logrotate
 Architecture: any
