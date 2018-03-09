@@ -1,6 +1,6 @@
 #include "queue.h"
-/* Alloca is defined in stdlib.h in NetBSD */
-#ifndef __NetBSD__
+/* Alloca is defined in stdlib.h in NetBSD/FreeBSD */
+#if !defined(__NetBSD__) && !defined(__FreeBSD__)
 #include <alloca.h>
 #endif
 #include <limits.h>
@@ -24,6 +24,10 @@
 #include <fnmatch.h>
 #include <sys/mman.h>
 #include <libgen.h>
+
+#if !defined(PATH_MAX) && defined(__FreeBSD__)
+#include <sys/param.h>
+#endif
 
 #include "log.h"
 #include "logrotate.h"
@@ -59,6 +63,7 @@ int asprintf(char **string_ptr, const char *format, ...)
 	va_start(arg, format);
 	size = vsnprintf(NULL, 0, format, arg);
 	size++;
+	va_end(arg);
 	va_start(arg, format);
 	str = malloc(size);
 	if (str == NULL) {
@@ -135,6 +140,7 @@ static const char *defTabooExts[] = {
 	".dpkg-dist",
 	".dpkg-new",
 	".dpkg-old",
+	".dpkg-tmp",
 	".rhn-cfg-tmp-*",
 	".rpmnew",
 	".rpmorig",
@@ -145,7 +151,7 @@ static const char *defTabooExts[] = {
 	".ucf-old",
 	"~"
 };
-static int defTabooCount = sizeof(defTabooExts) / sizeof(char *);
+static const int defTabooCount = sizeof(defTabooExts) / sizeof(char *);
 
 /* I shouldn't use globals here :-( */
 static char **tabooPatterns = NULL;
@@ -233,6 +239,7 @@ static char *readPath(const char *configFile, int lineNum, const char *key,
 		if( len == (size_t)(-1) || len == (size_t)(-2) || !iswprint(pwc) || iswblank(pwc) ) {
 		    message(MESS_ERROR, "%s:%d bad %s path %s\n",
 			    configFile, lineNum, key, start);
+		    free(start);
 		    return NULL;
 		}
 		chptr += len;
@@ -351,7 +358,7 @@ static char *readAddress(const char *configFile, int lineNum, const char *key,
     char *endtag, *chptr;
     char *start = *startPtr;
     char *address;
-	
+
     if ((endtag = isolateValue(configFile, lineNum, key, startPtr, buf, length)) != NULL) {
 
 	chptr = endtag;
@@ -362,11 +369,12 @@ static char *readAddress(const char *configFile, int lineNum, const char *key,
 	if (*chptr) {
 	    message(MESS_ERROR, "%s:%d bad %s address %s\n",
 		    configFile, lineNum, key, start);
+	    free(endtag);
 	    return NULL;
 	}
 
 	address = strdup(endtag);
-	
+
 	free(endtag);
 
 	return address;
@@ -509,7 +517,7 @@ static void copyLogInfo(struct logInfo *to, struct logInfo *from)
     to->olddirUid = from->olddirUid;
     to->olddirGid = from->olddirGid;
     if (from->compress_options_count) {
-        poptDupArgv(from->compress_options_count, from->compress_options_list, 
+        poptDupArgv(from->compress_options_count, from->compress_options_list,
                     &to->compress_options_count,  &to->compress_options_list);
     }
 	if (from->dateformat)
@@ -926,7 +934,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 	close(fd);
 	return 0;
     }
-    
+
 	if (!(pw = getpwuid(getuid()))) {
 		message(MESS_ERROR, "Logrotate UID is not in passwd file.\n");
 		close(fd);
@@ -935,15 +943,21 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 
 	if (getuid() == ROOT_UID) {
 		if ((sb.st_mode & 07533) != 0400) {
+			message(MESS_DEBUG,
+				"Potentially dangerous mode on %s: 0%o\n",
+				configFile, (unsigned) (sb.st_mode & 07777));
+		}
+
+		if (sb.st_mode & 0022) {
 			message(MESS_ERROR,
-				"Ignoring %s because of bad file mode - must be 0644 or 0444.\n",
+				"Ignoring %s because it is writable by group or others.\n",
 				configFile);
 			close(fd);
 			return 0;
 		}
 
 		if ((pw = getpwuid(ROOT_UID)) == NULL) {
-			message(MESS_DEBUG,
+			message(MESS_ERROR,
 				"Ignoring %s because there's no password entry for the owner.\n",
 				configFile);
 			close(fd);
@@ -953,7 +967,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 		if (sb.st_uid != ROOT_UID && (pw == NULL ||
 				sb.st_uid != pw->pw_uid ||
 				pw->pw_uid != ROOT_UID)) {
-			message(MESS_DEBUG,
+			message(MESS_ERROR,
 				"Ignoring %s because the file owner is wrong (should be root or user with uid 0).\n",
 				configFile);
 			close(fd);
@@ -968,7 +982,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				configFile);
 		close(fd);
 		return 1;
-	}   
+	}
 
 	/* We can't mmap empty file... */
 	if (length == 0) {
@@ -1021,7 +1035,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				state = STATE_SKIP_LINE;
 				continue;
 			}
-			
+
 			if (isalpha((unsigned char)*start)) {
 				if ((key = isolateWord(&start, &buf, length)) == NULL)
 					continue;
@@ -1035,7 +1049,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					newlog->flags &= ~LOG_FLAG_DELAYCOMPRESS;
 				} else if (!strcmp(key, "shred")) {
 					newlog->flags |= LOG_FLAG_SHRED;
-				} else if (!strcmp(key, "noshred")) { 
+				} else if (!strcmp(key, "noshred")) {
 					newlog->flags &= ~LOG_FLAG_SHRED;
 				} else if (!strcmp(key, "sharedscripts")) {
 					newlog->flags |= LOG_FLAG_SHAREDSCRIPTS;
@@ -1063,6 +1077,8 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					newlog->flags &= ~LOG_FLAG_DATEEXT;
 				} else if (!strcmp(key, "dateyesterday")) {
 					newlog->flags |= LOG_FLAG_DATEYESTERDAY;
+				} else if (!strcmp(key, "datehourago")) {
+					newlog->flags |= LOG_FLAG_DATEHOURAGO;
 				} else if (!strcmp(key, "dateformat")) {
 					freeLogItem(dateformat);
 					newlog->dateformat = isolateLine(&start, &buf, length);
@@ -1081,7 +1097,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					if (key == NULL)
 						continue;
 
-					rv = readModeUidGid(configFile, lineNum, key, "su", 
+					rv = readModeUidGid(configFile, lineNum, key, "su",
 								   &tmp_mode, &newlog->suUid,
 								   &newlog->suGid);
 					if (rv == -1) {
@@ -1175,7 +1191,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					}
 				} else if (!strcmp(key, "shredcycles")) {
 					free(key);
-					if ((key = isolateValue(configFile, lineNum, "shred cycles", 
+					if ((key = isolateValue(configFile, lineNum, "shred cycles",
 							&start, &buf, length)) != NULL) {
 						newlog->shred_cycles = strtoul(key, &chptr, 0);
 						if (*chptr || newlog->shred_cycles < 0) {
@@ -1255,7 +1271,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 							RAISE_ERROR();
 						}
 					}
-					else continue; 
+					else continue;
 				} else if (!strcmp(key, "maxage")) {
 					free(key);
 					if ((key = isolateValue
@@ -1343,14 +1359,17 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 							while (!isspace((unsigned char)*chptr) && *chptr != ',' && *chptr)
 								chptr++;
 
-							tabooPatterns = realloc(tabooPatterns, sizeof(*tabooPatterns) *
-										(tabooCount + 1));
-							bytes = asprintf(&pattern, "*%.*s", (int)(chptr - endtag), endtag);
+							/* accept only non-empty patterns to avoid exclusion of everything */
+							if (endtag < chptr) {
+								tabooPatterns = realloc(tabooPatterns, sizeof(*tabooPatterns) *
+											(tabooCount + 1));
+								bytes = asprintf(&pattern, "*%.*s", (int)(chptr - endtag), endtag);
 
-							/* should test for malloc() failure */
-							assert(bytes != -1);
-							tabooPatterns[tabooCount] = pattern;
-							tabooCount++;
+								/* should test for malloc() failure */
+								assert(bytes != -1);
+								tabooPatterns[tabooCount] = pattern;
+								tabooCount++;
+							}
 
 							endtag = chptr;
 							if (*endtag == ',')
@@ -1606,11 +1625,11 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 					free(globerr_msg);
 					globerr_msg = NULL;
 				}
-					
+
 				rc = glob(argv[argNum], GLOB_NOCHECK
 #ifdef GLOB_TILDE
                                                         | GLOB_TILDE
-#endif 
+#endif
                                                     , globerr, &globResult);
 				if (rc == GLOB_ABORTED) {
 					if (newlog->flags & LOG_FLAG_MISSINGOK) {
@@ -1623,7 +1642,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 						configFile, lineNum, argv[argNum], strerror(glob_errno));
 					if (rc == -1)
 					globerr_msg = NULL;
-					
+
 					globResult.gl_pathc = 0;
 				}
 
@@ -1857,16 +1876,16 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 				else {
 					/* isolateWord moves the "start" pointer.
 					 * If we have a line like
-					 *    rotate 5 
+					 *    rotate 5
 					 * after isolateWord "start" points to "5" and it
 					 * is OK to skip the line, but if we have a line
 					 * like the following
 					 *    nocompress
 					 * after isolateWord "start" points to "\n". In
-					 * this case if we skip a line, we skip the next 
-					 * line, not the current "nocompress" one, 
+					 * this case if we skip a line, we skip the next
+					 * line, not the current "nocompress" one,
 					 * because in the for cycle the "start"
-					 * pointer is increased by one and, after this, 
+					 * pointer is increased by one and, after this,
 					 * "start" points to the beginning of the next line.
 					*/
 					if (*start != '\n') {
@@ -1891,7 +1910,7 @@ static int readConfigFile(const char *configFile, struct logInfo *defConfig)
 	}
 
     }
- 
+
     if (scriptStart) {
 	message(MESS_ERROR,
 		"%s:prerotate, postrotate or preremove without endscript\n",

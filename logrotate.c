@@ -1,6 +1,6 @@
 #include "queue.h"
 /* alloca() is defined in stdlib.h in NetBSD */
-#ifndef __NetBSD__
+#if !defined(__NetBSD__) && !defined(__FreeBSD__)
 #include <alloca.h>
 #endif
 #include <limits.h>
@@ -27,14 +27,18 @@
 #include <limits.h>
 #endif
 
+#if !defined(PATH_MAX) && defined(__FreeBSD__)
+#include <sys/param.h>
+#endif
+
 #include "log.h"
 #include "logrotate.h"
 
 static void *prev_context;
 #ifdef WITH_SELINUX
 #include <selinux/selinux.h>
-int selinux_enabled = 0;
-int selinux_enforce = 0;
+static int selinux_enabled = 0;
+static int selinux_enforce = 0;
 #endif
 
 #ifdef WITH_ACL
@@ -533,8 +537,8 @@ static int createOutputFile(char *fileName, int flags, struct stat *sb,
 		close(fd);
 		return -1;
 	}
- 
-    if ((sb_create.st_uid != sb->st_uid || sb_create.st_gid != sb->st_gid) && 
+
+    if ((sb_create.st_uid != sb->st_uid || sb_create.st_gid != sb->st_gid) &&
 		fchown(fd, sb->st_uid, sb->st_gid)) {
 	message(MESS_ERROR, "error setting owner of %s to uid %d and gid %d: %s\n",
 		fileName, sb->st_uid, sb->st_gid, strerror(errno));
@@ -630,7 +634,7 @@ static int shred_file(int fd, char *filename, struct logInfo *log)
 		execvp(fullCommand[0], (void *) fullCommand);
 		exit(1);
 	}
-	
+
 	wait(&status);
 
 	if (!WIFEXITED(status) || WEXITSTATUS(status)) {
@@ -760,11 +764,12 @@ static int compressLogFile(char *name, struct logInfo *log, struct stat *sb)
 
 	movefd(inFile, STDIN_FILENO);
 	movefd(outFile, STDOUT_FILENO);
-	movefd(compressPipe[1], STDERR_FILENO);
 
 	if (switch_user_permanently(log) != 0) {
 		exit(1);
 	}
+
+	movefd(compressPipe[1], STDERR_FILENO);
 
 	envInFilename = alloca(strlen("LOGROTATE_COMPRESSED_FILENAME=") + strlen(name) + 2);
 	sprintf(envInFilename, "LOGROTATE_COMPRESSED_FILENAME=%s", name);
@@ -1217,7 +1222,7 @@ static int findNeedRotating(struct logInfo *log, int logNum, int force)
 
     if (force) {
 	/* user forced rotation of logs from command line */
-	state->doRotate = 1;   
+	state->doRotate = 1;
     }
     else if (log->maxsize && sb.st_size > log->maxsize) {
         state->doRotate = 1;
@@ -1428,11 +1433,16 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
 	free(rotNames->baseName);
 	rotNames->baseName = tempstr;
     }
-	
+
     /* Adjust "now" if we want yesterday's date */
     if (log->flags & LOG_FLAG_DATEYESTERDAY) {
         now.tm_hour = 12; /* set hour to noon to work around DST issues */
         now.tm_mday = now.tm_mday - 1;
+        mktime(&now);
+    }
+
+    if (log->flags & LOG_FLAG_DATEHOURAGO) {
+        now.tm_hour -= 1;
         mktime(&now);
     }
 
@@ -1719,7 +1729,7 @@ static int prerotateSingleLog(struct logInfo *log, int logNum,
 	    }
 	    if (hasErrors || i - 1 < 0)
 		    free(oldName);
-	    
+
 	}
 	free(newName);
     }				/* !LOG_FLAG_DATEEXT */
@@ -1892,7 +1902,7 @@ static int rotateSingleLog(struct logInfo *log, int logNum,
 		prev_acl = NULL;
 	}
 #endif /* WITH_ACL */
-		
+
     }
     return hasErrors;
 }
@@ -2004,10 +2014,10 @@ static int rotateLogSet(struct logInfo *log, int force)
     else
 	message(MESS_DEBUG, "empty log files are not rotated, ");
 
-    if (log->minsize) 
+    if (log->minsize)
 	message(MESS_DEBUG, "only log files >= %jd bytes are rotated, ", (intmax_t)log->minsize);
 
-    if (log->maxsize) 
+    if (log->maxsize)
 	message(MESS_DEBUG, "log files >= %jd are rotated earlier, ", (intmax_t)log->maxsize);
 
     if (log->rotateMinAge)
@@ -2544,7 +2554,7 @@ static int readState(const char *stateFilename)
 
 	filename = strdup(argv[0]);
 	unescape(filename);
-	
+
 	if ((st = findState(filename)) == NULL) {
 		free(argv);
 		free(filename);
@@ -2587,7 +2597,7 @@ int main(int argc, const char **argv)
 
     struct poptOption options[] = {
     	{"debug", 'd', 0, NULL, 'd',
-	 "Don't do anything, just test (implies -v)", NULL},
+	 "Don't do anything, just test and print debug messages", NULL},
 	{"force", 'f', 0, &force, 0, "Force file rotation", NULL},
 	{"mail", 'm', POPT_ARG_STRING, &mailCommand, 0,
 	 "Command to send mail (instead of `" DEFAULT_MAIL_COMMAND "')",
@@ -2613,6 +2623,9 @@ int main(int argc, const char **argv)
 	switch (arg) {
 	case 'd':
 	    debug = 1;
+	    message(MESS_NORMAL, "WARNING: logrotate in debug mode does nothing"
+		    " except printing debug messages!  Consider using verbose"
+		    " mode (-v) instead if this is not what you want.\n\n");
 	    /* fallthrough */
 	case 'v':
 	    logSetLevel(MESS_DEBUG);
