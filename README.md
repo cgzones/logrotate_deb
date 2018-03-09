@@ -6,10 +6,11 @@ The logrotate utility is designed to simplify the administration of log files on
 
 The latest release is:
 
-* [logrotate-3.13.0](https://github.com/logrotate/logrotate/releases/download/3.13.0/logrotate-3.13.0.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.13.0/logrotate-3.13.0.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.13.0))
+* [logrotate-3.14.0](https://github.com/logrotate/logrotate/releases/download/3.14.0/logrotate-3.14.0.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.14.0/logrotate-3.14.0.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.14.0))
 
 Previous releases:
 
+* [logrotate-3.13.0](https://github.com/logrotate/logrotate/releases/download/3.13.0/logrotate-3.13.0.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.13.0/logrotate-3.13.0.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.13.0))
 * [logrotate-3.12.3](https://github.com/logrotate/logrotate/releases/download/3.12.3/logrotate-3.12.3.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.12.3/logrotate-3.12.3.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.12.3))
 * [logrotate-3.12.2](https://github.com/logrotate/logrotate/releases/download/3.12.2/logrotate-3.12.2.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.12.2/logrotate-3.12.2.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.12.2))
 * [logrotate-3.12.1](https://github.com/logrotate/logrotate/releases/download/3.12.1/logrotate-3.12.1.tar.xz) ([sig](https://github.com/logrotate/logrotate/releases/download/3.12.1/logrotate-3.12.1.tar.xz.asc)) ([Changelog](https://github.com/logrotate/logrotate/releases/tag/3.12.1))
@@ -66,13 +67,13 @@ Obtain source either by [Downloading](#download) it or doing [Git checkout](#git
 Install dependencies for Debian systems:
 ```
 apt-get update
-apt-get install make autoconf libtool libpopt-dev xz-utils
+apt-get install autoconf automake libpopt-dev libtool make xz-utils
 ```
 
 Install dependencies for Fedora/CentOS systems:
 
 ```
-yum install make autoconf automake libtool popt-devel xz
+yum install autoconf automake libtool make popt-devel xz
 ```
 
 Compilation (`autoreconf` is optional if you obtained source from tarball):
