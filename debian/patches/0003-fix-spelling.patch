@@ -8,10 +8,10 @@ found by lintian
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/logrotate.c b/logrotate.c
-index 7da5da5..bac4a04 100644
+index 02d45e9..43b2ea0 100644
 --- a/logrotate.c
 +++ b/logrotate.c
-@@ -2670,7 +2670,7 @@ int main(int argc, const char **argv)
+@@ -2683,7 +2683,7 @@ int main(int argc, const char **argv)
  		" - Copyright (C) 1995-2001 Red Hat, Inc.\n");
  	fprintf(stderr,
  		"This may be freely redistributed under the terms of "

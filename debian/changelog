@@ -1,6 +1,6 @@
-logrotate (3.13.0-1) unstable; urgency=medium
+logrotate (3.14.0-1) unstable; urgency=medium
 
-  * New upstream version 3.13.0 (Closes: #879262)
+  * New upstream version 3.14.0 (Closes: #879262)
 
   * debian:
     - Switch to debhelper 11
@@ -16,7 +16,6 @@ logrotate (3.13.0-1) unstable; urgency=medium
     - patches:
       + Refresh patches, drop upstream applied ones
       + spelling fix
-      + add upstream patch about .dpkg-tmp taboo
     - rules:
       + Enable hardening
       + Add dh_missing --fail-missing
@@ -24,7 +23,7 @@ logrotate (3.13.0-1) unstable; urgency=medium
       + set correct path for mail command
     - watch: check signature
 
- -- Christian Göttsche <cgzones@googlemail.com>  Tue, 06 Feb 2018 17:49:46 +0100
+ -- Christian Göttsche <cgzones@googlemail.com>  Fri, 09 Mar 2018 21:51:05 +0100
 
 logrotate (3.11.0-0.1) unstable; urgency=low
 
