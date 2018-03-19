@@ -4,12 +4,12 @@ logrotate (3.14.0-1) unstable; urgency=medium
 
   * debian:
     - Switch to debhelper 11
-    - Support logrotation triggered by systemd timer
+    - Support logrotation triggered by systemd timer (Closes: #858021)
 
     - control:
-      + Set myself as maintainer
+      + Set myself as maintainer (Closes: #887151)
       + Bump standards version to 4.1.3
-      + Update vcs fields
+      + Update vcs fields (Closes: #823687)
       + add minimal autotest suite
     - cron.daily: Align with upstream
     - logrotate.conf: align with upstream
